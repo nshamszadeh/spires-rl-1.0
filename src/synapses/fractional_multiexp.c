@@ -164,3 +164,20 @@ void synapse_fractional_multiexp_apply_stdp(struct fractional_multiexp_synapse_d
     if (d)
         synapse_simple_apply_stdp(d->weights, spikes, ps);
 }
+
+void synapse_fractional_multiexp_zero_neuron(struct fractional_multiexp_synapse_data *d, size_t idx)
+{
+    /* traces/combined are per-presynaptic-neuron and can't reach anything once
+     * the efferent column is zeroed, so they're left to decay on their own. */
+    if (!d) return;
+    synapse_simple_zero_neuron(d->weights, idx);
+}
+
+/* traces/combined are deliberately left as they are: a restored neuron resumes
+ * with no accumulated synaptic history. */
+void synapse_fractional_multiexp_restore_neuron(struct fractional_multiexp_synapse_data *d, size_t idx,
+                                                const double *row, const double *col)
+{
+    if (!d) return;
+    synapse_simple_restore_neuron(d->weights, idx, row, col);
+}

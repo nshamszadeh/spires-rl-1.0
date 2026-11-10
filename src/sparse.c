@@ -308,3 +308,22 @@ struct csr_matrix csr_build_from_rows(const struct edge_rows *er)
     free(buf);
     return m;
 }
+
+void csr_zero_neuron(struct csr_matrix *m, size_t idx)
+{
+    if (!m || idx >= m->n) return;
+    for (size_t k = m->row_ptr[idx]; k < m->row_ptr[idx + 1]; k++)  /* afferent */
+        m->values[k] = 0.0;
+    for (size_t k = 0; k < m->nnz; k++)                             /* efferent */
+        if (m->col_idx[k] == idx) m->values[k] = 0.0;
+}
+
+void csr_restore_neuron(struct csr_matrix *m, size_t idx, const double *row, const double *col)
+{
+    if (!m || idx >= m->n || !row || !col) return;
+    for (size_t k = m->row_ptr[idx]; k < m->row_ptr[idx + 1]; k++)  /* afferent */
+        m->values[k] = row[m->col_idx[k]];
+    for (size_t i = 0; i < m->n; i++)                               /* efferent */
+        for (size_t k = m->row_ptr[i]; k < m->row_ptr[i + 1]; k++)
+            if (m->col_idx[k] == idx) m->values[k] = col[i];
+}

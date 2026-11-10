@@ -87,4 +87,16 @@ void   synapse_apply_plasticity(struct synapse_matrix *w,
  * read their own per-edge trace directly inside row_dot instead). */
 const double *synapse_prepare(struct synapse_matrix *w, const double *spikes, double dt);
 
+/* Severs a neuron: zeros its afferent row and efferent column in place (the
+ * sparsity pattern is preserved, the entries just become explicit zeros). */
+void   synapse_zero_neuron(struct synapse_matrix *w, size_t neuron_idx);
+/* Inverse of the above: sets neuron_idx's afferent row to `row` and its efferent
+ * column to `col` (both length n). Relies on zero_neuron having preserved the
+ * sparsity pattern, so entries that were never stored stay absent. row and col
+ * must agree on the diagonal (row[neuron_idx] == col[neuron_idx]); the column
+ * pass runs second and wins otherwise. Per-synapse-model dynamic state (PSC
+ * traces, fractional history) is NOT restored -- see each implementation. */
+void   synapse_restore_neuron(struct synapse_matrix *w, size_t neuron_idx,
+                              const double *row, const double *col);
+
 #endif // SYNAPSE_H

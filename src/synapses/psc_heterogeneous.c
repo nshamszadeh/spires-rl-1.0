@@ -232,3 +232,58 @@ const double *synapse_psc_heterogeneous_prepare(struct psc_heterogeneous_synapse
     }
     return NULL; /* unused: row_dot reads internal trace directly */
 }
+
+/* trace is per-EDGE here (parallel to weights), not per-neuron as in
+ * psc_homogeneous, so it gets cleared entry-by-entry alongside the weights. */
+void synapse_psc_heterogeneous_zero_neuron(struct psc_heterogeneous_synapse_data *d, size_t idx)
+{
+    if (!d || idx >= d->n)
+        return;
+    switch (d->is_sparse) {
+        case 0: {
+            for (size_t i = 0; i < d->n; i++) {
+                d->weights[d->n*idx + i] = 0.0;
+                d->weights[d->n*i + idx] = 0.0;
+                d->trace[d->n*idx + i]   = 0.0;
+                d->trace[d->n*i + idx]   = 0.0;
+            }
+        } break;
+        case 1: {
+            for (size_t k = d->row_ptr[idx]; k < d->row_ptr[idx + 1]; k++) { /* afferent */
+                d->weights[k] = 0.0;
+                d->trace[k]   = 0.0;
+            }
+            for (size_t k = 0; k < d->nnz; k++) {                            /* efferent */
+                if (d->col_idx[k] == idx) {
+                    d->weights[k] = 0.0;
+                    d->trace[k]   = 0.0;
+                }
+            }
+        } break;
+    }
+}
+
+/* Puts the weights back; the per-edge traces stay at 0, so restored edges resume
+ * with no accumulated PSC. tau is untouched throughout -- it was sampled once at
+ * build time and must survive a fault/restore cycle unchanged. */
+void synapse_psc_heterogeneous_restore_neuron(struct psc_heterogeneous_synapse_data *d, size_t idx,
+                                              const double *row, const double *col)
+{
+    if (!d || idx >= d->n || !row || !col)
+        return;
+    switch (d->is_sparse) {
+        case 0: {
+            for (size_t i = 0; i < d->n; i++) {
+                d->weights[d->n*idx + i] = row[i];
+                d->weights[d->n*i + idx] = col[i];
+            }
+        } break;
+        case 1: {
+            for (size_t k = d->row_ptr[idx]; k < d->row_ptr[idx + 1]; k++)   /* afferent */
+                d->weights[k] = row[d->col_idx[k]];
+            for (size_t i = 0; i < d->n; i++)                                /* efferent */
+                for (size_t k = d->row_ptr[i]; k < d->row_ptr[i + 1]; k++)
+                    if (d->col_idx[k] == idx) d->weights[k] = col[i];
+        } break;
+    }
+}

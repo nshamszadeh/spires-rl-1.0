@@ -148,6 +148,7 @@ SRCS := \
   $(SRC_DIR)/spires_api.c \
   $(SRC_DIR)/agile.c      \
   $(SRC_DIR)/spires_opt_agile.c \
+  $(SRC_DIR)/fault.c      \
   $(wildcard $(NEURON_DIR)/*.c) \
   $(wildcard $(SYNAPSE_DIR)/*.c)
 

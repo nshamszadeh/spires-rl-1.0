@@ -62,4 +62,7 @@ void   csr_scale(struct csr_matrix *m, double factor);
 double csr_spectral_radius(const struct csr_matrix *m, size_t n);
 double csr_spectral_radius_power_iteration(const struct csr_matrix *m, size_t n);
 
+void   csr_zero_neuron(struct csr_matrix *m, size_t idx);
+void   csr_restore_neuron(struct csr_matrix *m, size_t idx, const double *row, const double *col);
+
 #endif // SPARSE_H

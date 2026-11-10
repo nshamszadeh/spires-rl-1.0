@@ -219,3 +219,46 @@ void synapse_apply_plasticity(struct synapse_matrix *w,
         break;
     }
 }
+
+void synapse_zero_neuron(struct synapse_matrix *w, size_t neuron_idx)
+{
+    switch (w->type) {
+    case SYNAPSE_SIMPLE:
+        synapse_simple_zero_neuron((struct simple_synapse_data *)w->data, neuron_idx);
+        break;
+    case SYNAPSE_PSC_HOMOGENEOUS:
+        synapse_psc_homogeneous_zero_neuron((struct psc_homogeneous_synapse_data *)w->data, neuron_idx);
+        break;
+    case SYNAPSE_PSC_HETEROGENEOUS:
+        synapse_psc_heterogeneous_zero_neuron((struct psc_heterogeneous_synapse_data *)w->data, neuron_idx);
+        break;
+    case SYNAPSE_FRACTIONAL:
+        synapse_fractional_zero_neuron((struct fractional_synapse_data *)w->data, neuron_idx);
+        break;
+    case SYNAPSE_FRACTIONAL_MULTIEXP:
+        synapse_fractional_multiexp_zero_neuron((struct fractional_multiexp_synapse_data *)w->data, neuron_idx);
+        break;
+    }
+}
+
+void synapse_restore_neuron(struct synapse_matrix *w, size_t neuron_idx,
+                            const double *row, const double *col)
+{
+    switch (w->type) {
+    case SYNAPSE_SIMPLE:
+        synapse_simple_restore_neuron((struct simple_synapse_data *)w->data, neuron_idx, row, col);
+        break;
+    case SYNAPSE_PSC_HOMOGENEOUS:
+        synapse_psc_homogeneous_restore_neuron((struct psc_homogeneous_synapse_data *)w->data, neuron_idx, row, col);
+        break;
+    case SYNAPSE_PSC_HETEROGENEOUS:
+        synapse_psc_heterogeneous_restore_neuron((struct psc_heterogeneous_synapse_data *)w->data, neuron_idx, row, col);
+        break;
+    case SYNAPSE_FRACTIONAL:
+        synapse_fractional_restore_neuron((struct fractional_synapse_data *)w->data, neuron_idx, row, col);
+        break;
+    case SYNAPSE_FRACTIONAL_MULTIEXP:
+        synapse_fractional_multiexp_restore_neuron((struct fractional_multiexp_synapse_data *)w->data, neuron_idx, row, col);
+        break;
+    }
+}

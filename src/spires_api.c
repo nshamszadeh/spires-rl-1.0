@@ -13,11 +13,17 @@
 #include "neuron.h"
 #include "synapse.h"
 #include "spires_opt_agile.h"
+#include "fault.h"
 
 
 /* The public opaque handle wraps a backend pointer. */
 struct spires_reservoir {
     struct reservoir *impl; /* owned */
+};
+
+/* Public opaque handle for internal fault structure. */
+struct spires_fault_system {
+	struct fault_system *impl; /* yes ahaha */
 };
 
 /* --------------- lifecycle --------------- */
@@ -316,6 +322,88 @@ size_t spires_num_inputs(const spires_reservoir *r)
 size_t spires_num_outputs(const spires_reservoir *r)
 {
     return (r && r->impl) ? r->impl->num_outputs : 0;
+}
+
+/* ---------------- Fault Injection ------------- */
+/* spires_fault_type is cast straight across to the internal enum fault_type,
+   so the two must stay in lockstep -- including when the commented-out members
+   they both carry get uncommented. */
+_Static_assert((int)SPIRES_FAULT_NONE == (int)NONE,
+               "spires_fault_type and enum fault_type have diverged");
+_Static_assert((int)SPIRES_FAULT_CLAMP_LOW == (int)CLAMP_LOW,
+               "spires_fault_type and enum fault_type have diverged");
+
+// make sure reservoir is already created before calling.
+spires_status spires_create_fault_system(const spires_reservoir *r, spires_fault_type fault_type, unsigned int neuron_seed, double fault_state, spires_fault_system **out_fs)
+{
+	if (!r || !r->impl || !out_fs)
+		return SPIRES_ERR_INVALID_ARG;
+
+	enum fault_type fault_type_internal = (enum fault_type)fault_type;
+	struct fault_system *impl = create_fault_system(r->impl, fault_type_internal, neuron_seed, fault_state); // also initializes
+	if (!impl)
+		return SPIRES_ERR_INTERNAL;
+	spires_fault_system *fs = malloc(sizeof(*fs));
+	if (!fs) {
+		free_fault_system(impl);
+		return SPIRES_ERR_ALLOC;
+	}
+	fs->impl = impl;
+	*out_fs = fs;
+	return SPIRES_OK;
+}
+
+void spires_destroy_fault_system(spires_fault_system *fs)
+{
+	if (!fs)
+    	return;
+    if (fs->impl)
+        free_fault_system(fs->impl);
+    free(fs);
+}
+
+spires_status spires_generate_fault(spires_reservoir *r, spires_fault_system *fs)
+{
+    if (!r || !fs || !r->impl || !fs->impl)
+        return SPIRES_ERR_INVALID_ARG;
+
+    /* FAULT_EXHAUSTED folds into SPIRES_ERR_INTERNAL rather than adding a
+       public status code: it isn't SPIRES_OK (nothing was injected), so a
+       caller looping "inject until dead" still terminates. */
+    if (generate_fault(r->impl, fs->impl) != FAULT_OK)
+        return SPIRES_ERR_INTERNAL;
+    return SPIRES_OK;
+}
+
+spires_status spires_fault_neuron(spires_reservoir *r, spires_fault_system *fs, size_t neuron_idx)
+{
+    if (!r || !fs || !r->impl || !fs->impl || neuron_idx >= r->impl->num_neurons
+        || r->impl->failed_neurons[neuron_idx])
+        return SPIRES_ERR_INVALID_ARG;
+
+    if (fault_neuron(r->impl, fs->impl, neuron_idx) != FAULT_OK)
+        return SPIRES_ERR_INTERNAL;
+    return SPIRES_OK;
+}
+
+spires_status spires_restore_reservoir(spires_reservoir *r, spires_fault_system *fs)
+{
+    if (!r || !fs || !r->impl || !fs->impl)
+        return SPIRES_ERR_INVALID_ARG;
+
+    if (restore_reservoir(r->impl, fs->impl) != FAULT_OK)
+        return SPIRES_ERR_INTERNAL;
+    return SPIRES_OK;
+}
+
+spires_status spires_restore_neuron(spires_reservoir *r, spires_fault_system *fs, size_t neuron_idx)
+{
+    if (!r || !fs || !r->impl || !fs->impl)
+        return SPIRES_ERR_INVALID_ARG;
+
+    if (restore_neuron(r->impl, fs->impl, neuron_idx) != FAULT_OK)
+        return SPIRES_ERR_INTERNAL;
+    return SPIRES_OK;
 }
 
 /* ---------------- optimization ---------------- */

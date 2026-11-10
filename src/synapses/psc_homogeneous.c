@@ -91,3 +91,19 @@ void synapse_psc_homogeneous_apply_stdp(struct psc_homogeneous_synapse_data *d, 
     if (d)
         synapse_simple_apply_stdp(d->weights, spikes, ps);
 }
+
+void synapse_psc_homogeneous_zero_neuron(struct psc_homogeneous_synapse_data *d, size_t idx)
+{
+    if (!d) return;
+    d->trace[idx] = 0.0;
+    synapse_simple_zero_neuron(d->weights, idx);
+}
+
+/* trace is deliberately left at 0: a restored neuron resumes with no
+ * accumulated synaptic history, rather than the trace it had when it failed. */
+void synapse_psc_homogeneous_restore_neuron(struct psc_homogeneous_synapse_data *d, size_t idx,
+                                            const double *row, const double *col)
+{
+    if (!d) return;
+    synapse_simple_restore_neuron(d->weights, idx, row, col);
+}

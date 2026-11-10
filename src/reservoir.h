@@ -47,6 +47,7 @@ struct reservoir {
     struct plasticity_state plasticity;   /* traces owned here */
     uint64_t seed;              // seed this reservoir was built from
     struct spires_rng rng;      // per-reservoir stream; replaces global rand()
+    int *failed_neurons;        // failed_neurons[i] == 1 => neuron i is clamped by the fault system (fault.h)
 };
 
 /* Construction parameters. Grouped so that adding one does not lengthen a

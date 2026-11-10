@@ -38,4 +38,8 @@ const double *synapse_fractional_prepare(struct fractional_synapse_data *d, cons
 
 void synapse_fractional_apply_stdp(struct fractional_synapse_data *d, const double *spikes, struct plasticity_state *ps);
 
+void   synapse_fractional_zero_neuron(struct fractional_synapse_data *d, size_t idx);
+void   synapse_fractional_restore_neuron(struct fractional_synapse_data *d, size_t idx,
+                                         const double *row, const double *col);
+
 #endif // SYNAPSE_FRACTIONAL_H

@@ -26,4 +26,8 @@ void   synapse_psc_heterogeneous_scale(struct psc_heterogeneous_synapse_data *d,
 double synapse_psc_heterogeneous_spectral_radius(const struct psc_heterogeneous_synapse_data *d);
 const double *synapse_psc_heterogeneous_prepare(struct psc_heterogeneous_synapse_data *d, const double *spikes, double dt);
 
+void   synapse_psc_heterogeneous_zero_neuron(struct psc_heterogeneous_synapse_data *d, size_t idx);
+void   synapse_psc_heterogeneous_restore_neuron(struct psc_heterogeneous_synapse_data *d, size_t idx,
+                                                const double *row, const double *col);
+
 #endif // SYNAPSE_PSC_HETEROGENEOUS_H

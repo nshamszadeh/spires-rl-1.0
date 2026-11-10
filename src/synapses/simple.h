@@ -30,4 +30,8 @@ void   synapse_simple_apply_stdp(struct simple_synapse_data *d,
                                  const double *spikes,
                                  struct plasticity_state *ps);
 
+void   synapse_simple_zero_neuron(struct simple_synapse_data *d, size_t idx);
+void   synapse_simple_restore_neuron(struct simple_synapse_data *d, size_t idx,
+                                     const double *row, const double *col);
+
 #endif // SYNAPSE_SIMPLE_H

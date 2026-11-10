@@ -89,6 +89,24 @@ struct reservoir *create_reservoir(const struct reservoir_params *p)
     
     reservoir->shared_neuron_data = local_shared_neuron_data; // malloc'd in function if flif_gl is used, must free
 
+    reservoir->failed_neurons = calloc(p->num_neurons, sizeof(int)); // calloc to zero-initialize the array
+    if (!(reservoir->failed_neurons)) {
+        fprintf(stderr, "Error allocating memory for failed_neurons.\n");
+        for (size_t i = 0; i < p->num_neurons; i++) {
+            free_neuron(reservoir->neurons[i], p->neuron_type);
+        }
+        if (p->neuron_type == FLIF_GL && reservoir->shared_neuron_data != NULL) {
+            free(reservoir->shared_neuron_data);
+        }
+        free(reservoir->neurons);
+        free(reservoir->plasticity.x_pre_e);
+        free(reservoir->plasticity.x_post_e);
+        free(reservoir->plasticity.x_pre_i);
+        free(reservoir->plasticity.x_post_i);
+        free(reservoir);
+        return NULL;
+    }
+
     return reservoir;
 }
 
@@ -189,7 +207,7 @@ void step_reservoir(struct reservoir *r, const double *input_vector)
     double new_spikes[num_neurons]; 
     
     for (size_t i = 0; i < num_neurons; i++) {
-        last_spikes[i] = get_neuron_spike(r->neurons[i], r->neuron_type);
+        last_spikes[i] = r->failed_neurons[i] ? 0.0 : get_neuron_spike(r->neurons[i], r->neuron_type);
     }
 
     // --- Internal simulation loop (the "micro-steps") ---
@@ -200,11 +218,13 @@ void step_reservoir(struct reservoir *r, const double *input_vector)
 
         #pragma omp parallel for // omp ftw
         for (size_t i = 0; i < num_neurons; i++) {
-            double recurrent_input = synapse_row_dot(&r->W, i, effective_input);
-
-            double total_input = external_inputs[i] + recurrent_input;
-            update_neuron(r->neurons[i], r->neuron_type, total_input, r->dt);
-            new_spikes[i] = get_neuron_spike(r->neurons[i], r->neuron_type);
+            if (r->failed_neurons[i]) {new_spikes[i] = 0.0;} // skip processing for faulted neurons
+            else {
+                double recurrent_input = synapse_row_dot(&r->W, i, effective_input);
+                double total_input = external_inputs[i] + recurrent_input;
+                update_neuron(r->neurons[i], r->neuron_type, total_input, r->dt);
+                new_spikes[i] = get_neuron_spike(r->neurons[i], r->neuron_type);
+            }
         }
 
         /* Decay, then update weights against strictly-earlier activity, then
@@ -235,7 +255,8 @@ int compute_output(struct reservoir *reservoir, double *output_vector)
     // using a VLA on the stack
     double state[num_neurons];
     for (size_t i = 0; i < num_neurons; i++) {
-        state[i] = get_neuron_state(reservoir->neurons[i], reservoir->neuron_type);
+        state[i] = reservoir->failed_neurons[i] ? 0.0 :
+        get_neuron_state(reservoir->neurons[i], reservoir->neuron_type);
     }
 
     // compute the output vector: output_vector = W_out * state
@@ -252,7 +273,8 @@ double compute_activity(struct reservoir *reservoir)
     double total_activity = 0.0;
     double spike; 
     for (size_t i = 0; i < reservoir->num_neurons; i++) {
-        spike = get_neuron_spike(reservoir->neurons[i], reservoir->neuron_type);
+        spike = reservoir->failed_neurons[i] ? 0.0 :
+        get_neuron_spike(reservoir->neurons[i], reservoir->neuron_type);
         total_activity += spike;
     }
     
@@ -266,7 +288,8 @@ void read_reservoir_state(struct reservoir *reservoir, double *buffer)
         fprintf(stderr, "Error reading reservoir state, buffer uninitialized\n");
 
     for (size_t i = 0; i < reservoir->num_neurons; i++) {
-        buffer[i] = get_neuron_state(reservoir->neurons[i], reservoir->neuron_type);
+        buffer[i] = reservoir->failed_neurons[i] ? 0.0 :
+        get_neuron_state(reservoir->neurons[i], reservoir->neuron_type);
     }
 }
 
@@ -279,7 +302,8 @@ void read_reservoir_spikes(struct reservoir *reservoir, double *buffer)
         return;
     }
     for (size_t i = 0; i < reservoir->num_neurons; i++)
-        buffer[i] = get_neuron_spike(reservoir->neurons[i], reservoir->neuron_type);
+        buffer[i] = reservoir->failed_neurons[i] ? 0.0 :
+        get_neuron_spike(reservoir->neurons[i], reservoir->neuron_type);
 }
 
 // copies the neuron->V for each neuron into state
@@ -291,7 +315,7 @@ double *copy_reservoir_state(struct reservoir *reservoir)
         return NULL;
     }
     for (size_t i = 0; i < reservoir->num_neurons; i++) {
-        state[i] = get_neuron_state(reservoir->neurons[i], reservoir->neuron_type);
+        state[i] = reservoir->failed_neurons[i] ? 0.0 : get_neuron_state(reservoir->neurons[i], reservoir->neuron_type);
     }
     return state; // caller will need to free()
 }
@@ -363,9 +387,11 @@ void free_reservoir(struct reservoir *reservoir)
     free(reservoir->neurons);
     free(reservoir->W_in);
     free(reservoir->W_out);
+    free(reservoir->failed_neurons);
     synapse_free(&reservoir->W);
     reservoir->W_in = NULL;
     reservoir->W_out = NULL;
+    reservoir->failed_neurons = NULL;
     free(reservoir);
     reservoir = NULL;
 }
@@ -879,6 +905,9 @@ void train_output_rls(struct reservoir *reservoir, double *input_series,
 }
 
 // Function to reset neurons in reservoir (helpful for fractional order neuron models)
+// Faults survive a reset: failed_neurons and the severed weights are left as they
+// are. Restore with spires_restore_reservoir, then reset, to get a repaired
+// reservoir back.
 void reset_reservoir(struct reservoir *reservoir)
 {
     if (reservoir == NULL) {

@@ -149,3 +149,19 @@ void synapse_fractional_apply_stdp(struct fractional_synapse_data *d, const doub
     if (d)
         synapse_simple_apply_stdp(d->weights, spikes, ps);
 }
+
+void synapse_fractional_zero_neuron(struct fractional_synapse_data *d, size_t idx)
+{
+    if (!d || idx >= d->n) return;
+    d->I[idx] = 0.0;
+    synapse_simple_zero_neuron(d->weights, idx);
+}
+
+/* I/I_history are deliberately left as they are: a restored neuron resumes with
+ * no accumulated synaptic current, rather than what it carried when it failed. */
+void synapse_fractional_restore_neuron(struct fractional_synapse_data *d, size_t idx,
+                                       const double *row, const double *col)
+{
+    if (!d) return;
+    synapse_simple_restore_neuron(d->weights, idx, row, col);
+}

@@ -42,4 +42,8 @@ const double *synapse_fractional_multiexp_prepare(struct fractional_multiexp_syn
 
 void synapse_fractional_multiexp_apply_stdp(struct fractional_multiexp_synapse_data *d, const double *spikes, struct plasticity_state *ps);
 
+void   synapse_fractional_multiexp_zero_neuron(struct fractional_multiexp_synapse_data *d, size_t idx);
+void   synapse_fractional_multiexp_restore_neuron(struct fractional_multiexp_synapse_data *d, size_t idx,
+                                                  const double *row, const double *col);
+
 #endif // SYNAPSE_FRACTIONAL_MULTIEXP_H

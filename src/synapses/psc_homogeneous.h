@@ -27,4 +27,8 @@ const double *synapse_psc_homogeneous_prepare(struct psc_homogeneous_synapse_dat
 
 void synapse_psc_homogeneous_apply_stdp(struct psc_homogeneous_synapse_data *d, const double *spikes, struct plasticity_state *ps);
 
+void   synapse_psc_homogeneous_zero_neuron(struct psc_homogeneous_synapse_data *d, size_t idx);
+void   synapse_psc_homogeneous_restore_neuron(struct psc_homogeneous_synapse_data *d, size_t idx,
+                                              const double *row, const double *col);
+
 #endif // SYNAPSE_PSC_HOMOGENEOUS_H

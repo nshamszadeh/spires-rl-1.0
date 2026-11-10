@@ -177,3 +177,32 @@ void synapse_simple_apply_stdp(struct simple_synapse_data *d,
         }
     }
 }
+
+void synapse_simple_zero_neuron(struct simple_synapse_data *d, size_t idx)
+{
+    if (!d || idx >= d->n)
+        return;
+    if (d->is_sparse) {
+        csr_zero_neuron(&d->storage.csr, idx);
+    } else {
+        double *W = d->storage.dense;
+        memset(&W[idx * d->n], 0, d->n * sizeof(double));   /* afferent row */
+        for (size_t i = 0; i < d->n; i++)                   /* efferent column */
+            W[i * d->n + idx] = 0.0;
+    }
+}
+
+void synapse_simple_restore_neuron(struct simple_synapse_data *d, size_t idx,
+                                   const double *row, const double *col)
+{
+    if (!d || idx >= d->n || !row || !col)
+        return;
+    if (d->is_sparse) {
+        csr_restore_neuron(&d->storage.csr, idx, row, col);
+    } else {
+        double *W = d->storage.dense;
+        memcpy(&W[idx * d->n], row, d->n * sizeof(double)); /* afferent row */
+        for (size_t i = 0; i < d->n; i++)                   /* efferent column */
+            W[i * d->n + idx] = col[i];
+    }
+}

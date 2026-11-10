@@ -31,6 +31,7 @@ typedef enum {
 
 /* Opaque handle (implementation is private) */
 typedef struct spires_reservoir spires_reservoir;
+typedef struct spires_fault_system spires_fault_system;
 
 /* ----------------------------
  * Public enums mirroring backend options
@@ -129,6 +130,16 @@ typedef enum {
     SPIRES_PLASTICITY_STDP
 } spires_plasticity_type;
 
+typedef enum {
+    SPIRES_FAULT_NONE = 0,
+    // TRANSIENT, // Brief change in randomly chosen neuron structure/behavior (potential application: simulating radioactive environment)
+    // METASTABLE, // Fast, (possibly) random spiking of randomly chosen neuron.
+    // EDGE_FAULT, // Random neuron's individual edge weight(s) set to 0
+    // GLOBAL, // Gaussian pertubation vector multiplied to all nonzero synapses
+    // CLAMP_HIGH, // Clamps a random neuron's weights and activation to V_th
+    SPIRES_FAULT_CLAMP_LOW // Clamps a random neuron's weights to 0 and activation to V_rest (or 0, not sure yet...)
+} spires_fault_type;
+
 /* ----------------------------
  * Creation-time configuration
  * (kept minimal; forwards to create_reservoir(...) as-is)
@@ -173,6 +184,9 @@ uint64_t spires_random_seed(void);
 spires_status spires_reservoir_create(const spires_reservoir_config *cfg,
                                       spires_reservoir **out_r);
 void          spires_reservoir_destroy(spires_reservoir *r);
+/* Re-initializes every neuron. Injected faults survive a reset (failed neurons
+   stay clamped and their weights stay severed); call spires_restore_reservoir
+   first to get a repaired reservoir. */
 spires_status spires_reservoir_reset(spires_reservoir *r);
 
 /* ----------------------------
@@ -315,6 +329,30 @@ int spires_optimize(const spires_reservoir_config *base_config,
                     const double *input_series,
 		    const double *target_series,
 		    size_t series_length);
+
+/* --------------------------
+ * Fault Injection
+ *-----------------------------*/
+/* Create after the reservoir is fully initialized: the fault system snapshots
+   W at creation and restores from that snapshot. Under plasticity, restoring
+   a neuron therefore puts its weights back to their values at creation,
+   discarding whatever they learned since. Victims are drawn with rand_r on
+   the fault system's own state (seeded by neuron_seed), independent of the
+   reservoir's RNG. fault_state must be 0.0. */
+spires_status spires_create_fault_system(const spires_reservoir *r, spires_fault_type fault_type, unsigned int neuron_seed, double fault_state, spires_fault_system **out_fs);
+/* Returns non-OK once every neuron has already failed (nothing left to inject). */
+spires_status spires_generate_fault(spires_reservoir *r, spires_fault_system *fs);
+/* spires_generate_fault for a chosen neuron. SPIRES_ERR_INVALID_ARG if
+   neuron_idx is out of range or has already failed. */
+spires_status spires_fault_neuron(spires_reservoir *r, spires_fault_system *fs, size_t neuron_idx);
+/* Undo faults: put back the severed weights and the membrane state saved when
+   the neuron failed. Synaptic dynamic state (PSC traces, fractional history,
+   STDP traces) is NOT restored -- a repaired neuron resumes with no
+   accumulated history. Restoring an already-healthy neuron is a no-op, not
+   an error. */
+spires_status spires_restore_reservoir(spires_reservoir *r, spires_fault_system *fs);
+spires_status spires_restore_neuron(spires_reservoir *r, spires_fault_system *fs, size_t neuron_idx);
+void spires_destroy_fault_system(spires_fault_system *fs);
 
 
 #ifdef __cplusplus
